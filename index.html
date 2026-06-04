@@ -583,10 +583,10 @@
 
 <script>
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSw_18t7m_RbtB_j69O2nFLZcoxzsZsN9SRZobExoquJf0bbs-6ly_JrTN6VknJ5XGiaA_6lhM6H_Pn/pub?gid=0&single=true&output=csv';
-
 const AGENTS = ['victor', 'martin', 'guillermo'];
 const AGENT_COLORS = { victor: '#3DBCC4', martin: '#7c6af7', guillermo: '#ff9e5e' };
 
+// ── Clock ──
 function updateClock() {
   const now = new Date();
   document.getElementById('clock').textContent =
@@ -595,83 +595,83 @@ function updateClock() {
 setInterval(updateClock, 1000);
 updateClock();
 
+// ── Parse CSV ──
 function parseCSV(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const data = { byDay: {}, totals: { victor:{}, martin:{}, guillermo:{} } };
-  const cols = { agendadas:1, realizadas:2, nocontact:3, sinresp:4, cotiz:5, dep:6 };
+  const data = {
+    byDay: {},
+    totals: { victor:{realizadas:0,nocontact:0,sinresp:0,cotiz:0,dep:0},
+               martin:{realizadas:0,nocontact:0,sinresp:0,cotiz:0,dep:0},
+               guillermo:{realizadas:0,nocontact:0,sinresp:0,cotiz:0,dep:0} },
+    agendadasTotal: 0
+  };
+
   let currentDay = null;
 
   for (const line of lines) {
     const parts = line.split(',').map(v => v.trim());
     const first = parts[0].toLowerCase();
 
+    // Day header row — col 0 = day label, col 1 = agendadas total
     if (/^\d+\s+junio/.test(first)) {
       currentDay = parseInt(first);
       data.byDay[currentDay] = { victor:0, martin:0, guillermo:0 };
+      const ag = parseInt(parts[1]) || 0;
+      data.agendadasTotal += ag;
       continue;
     }
 
     const agentKey = AGENTS.find(a => first.startsWith(a));
     if (!agentKey || !currentDay) continue;
 
-    const row = {
-      agendadas: parseInt(parts[cols.agendadas]) || 0,
-      realizadas: parseInt(parts[cols.realizadas]) || 0,
-      nocontact:  parseInt(parts[cols.nocontact])  || 0,
-      sinresp:    parseInt(parts[cols.sinresp])    || 0,
-      cotiz:      parseInt(parts[cols.cotiz])      || 0,
-      dep:        parseInt(parts[cols.dep])        || 0
-    };
+    const t = data.totals[agentKey];
+    t.realizadas += parseInt(parts[2]) || 0;
+    t.nocontact  += parseInt(parts[3]) || 0;
+    t.sinresp    += parseInt(parts[4]) || 0;
+    t.cotiz      += parseInt(parts[5]) || 0;
+    t.dep        += parseInt(parts[6]) || 0;
 
-    for (const key of Object.keys(row)) {
-      data.totals[agentKey][key] = (data.totals[agentKey][key] || 0) + row[key];
-    }
-    data.byDay[currentDay][agentKey] = (data.byDay[currentDay][agentKey] || 0) + row.dep;
+    data.byDay[currentDay][agentKey] = (data.byDay[currentDay][agentKey] || 0) + (parseInt(parts[6]) || 0);
   }
   return data;
 }
 
+// ── Render ──
 function renderDashboard(data) {
-  const { totals, byDay } = data;
+  const { totals, byDay, agendadasTotal } = data;
 
-  let tAg=0, tRe=0, tSr=0, tCo=0, tDe=0;
+  // Team totals
+  let tRe=0, tSr=0, tCo=0, tDe=0;
   for (const a of AGENTS) {
-    tAg += totals[a].agendadas || 0;
-    tRe += totals[a].realizadas || 0;
-    tSr += totals[a].sinresp || 0;
-    tCo += totals[a].cotiz || 0;
-    tDe += totals[a].dep || 0;
+    tRe += totals[a].realizadas;
+    tSr += totals[a].sinresp;
+    tCo += totals[a].cotiz;
+    tDe += totals[a].dep;
   }
-  document.getElementById('t-agendadas').textContent = tAg;
-  document.getElementById('t-realizadas').textContent = tRe;
+  document.getElementById('t-agendadas').textContent    = agendadasTotal;
+  document.getElementById('t-realizadas').textContent   = tRe;
   document.getElementById('t-sinrespuesta').textContent = tSr;
   document.getElementById('t-cotizaciones').textContent = tCo;
-  document.getElementById('t-depositos').textContent = tDe;
-  const convPct = tCo > 0 ? Math.round((tDe / tCo) * 100) : 0;
-  document.getElementById('t-conversion').textContent = convPct + '%';
+  document.getElementById('t-depositos').textContent    = tDe;
+  document.getElementById('t-conversion').textContent   = tCo > 0 ? Math.round((tDe/tCo)*100) + '%' : '0%';
 
+  // Agent cards
   const ids = { victor:'v', martin:'m', guillermo:'g' };
   for (const agent of AGENTS) {
     const p = ids[agent];
     const t = totals[agent];
-    document.getElementById(`${p}-realizadas`).textContent = t.realizadas || 0;
-    document.getElementById(`${p}-nocontact`).textContent = t.nocontact || 0;
-    document.getElementById(`${p}-sinresp`).textContent = t.sinresp || 0;
-    document.getElementById(`${p}-cotiz`).textContent = t.cotiz || 0;
-    document.getElementById(`${p}-dep`).textContent = t.dep || 0;
-
-    const fp = p[0];
-    const re = t.realizadas || 1;
-    document.getElementById(`${fp}f1`).style.width = '100%';
-    document.getElementById(`${fp}f2`).style.width = Math.min(100, (t.cotiz||0) > 0 ? Math.round(((t.cotiz||0)/re)*100) : 0) + '%';
-    document.getElementById(`${fp}f3`).style.width = Math.min(100, (t.dep||0) > 0 ? Math.round(((t.dep||0)/re)*100) : 0) + '%';
+    document.getElementById(p + '-realizadas').textContent = t.realizadas;
+    document.getElementById(p + '-nocontact').textContent  = t.nocontact;
+    document.getElementById(p + '-sinresp').textContent    = t.sinresp;
+    document.getElementById(p + '-cotiz').textContent      = t.cotiz;
+    document.getElementById(p + '-dep').textContent        = t.dep;
   }
 
+  // Bar chart — deposits per day
   const days = Object.keys(byDay).sort((a,b) => a-b);
   const maxDep = Math.max(1, ...days.map(d => AGENTS.reduce((s,a) => s + (byDay[d][a]||0), 0)));
   const chartEl = document.getElementById('bar-chart');
   chartEl.innerHTML = '';
-
   for (const day of days) {
     const group = document.createElement('div');
     group.className = 'bar-group';
@@ -684,7 +684,7 @@ function renderDashboard(data) {
       bar.style.height = Math.max(4, Math.round((val/maxDep)*100)) + '%';
       bar.style.background = AGENT_COLORS[agent];
       bar.style.opacity = val > 0 ? '1' : '0.15';
-      bar.title = `${agent}: ${val}`;
+      bar.title = agent + ': ' + val;
       barsDiv.appendChild(bar);
     }
     const label = document.createElement('div');
@@ -695,67 +695,62 @@ function renderDashboard(data) {
     chartEl.appendChild(group);
   }
 
-  const ranked = AGENTS.map(a => ({ name:a, dep: totals[a].dep||0 })).sort((a,b) => b.dep-a.dep);
+  // Ranking
+  const ranked = AGENTS.map(a => ({ name:a, dep: totals[a].dep })).sort((a,b) => b.dep-a.dep);
   const maxRank = ranked[0].dep || 1;
   const rankEl = document.getElementById('ranking-rows');
   rankEl.innerHTML = '';
   ranked.forEach((item, i) => {
+    const color = AGENT_COLORS[item.name];
+    const name = item.name.charAt(0).toUpperCase() + item.name.slice(1);
     const row = document.createElement('div');
     row.className = 'rank-row';
-    const color = AGENT_COLORS[item.name];
-    const displayName = item.name.charAt(0).toUpperCase() + item.name.slice(1);
-    row.innerHTML = `
-      <div class="rank-num ${i===0?'top':''}">${i+1}</div>
-      <div class="rank-info">
-        <div class="rank-name">${displayName}</div>
-        <div class="rank-bar-wrap">
-          <div class="rank-bar-fill" style="width:${Math.round((item.dep/maxRank)*100)}%;background:${color}"></div>
-        </div>
-      </div>
-      <div class="rank-value" style="color:${color}">${item.dep}</div>
-    `;
+    row.innerHTML =
+      '<div class="rank-num ' + (i===0?'top':'') + '">' + (i+1) + '</div>' +
+      '<div class="rank-info">' +
+        '<div class="rank-name">' + name + '</div>' +
+        '<div class="rank-bar-wrap"><div class="rank-bar-fill" style="width:' + Math.round((item.dep/maxRank)*100) + '%;background:' + color + '"></div></div>' +
+      '</div>' +
+      '<div class="rank-value" style="color:' + color + '">' + item.dep + '</div>';
     rankEl.appendChild(row);
   });
 
+  // Timestamp
   const now = new Date();
   document.getElementById('last-update').innerHTML =
-    `<span class="status-dot"></span>Actualizado: ${now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}`;
+    '<span class="status-dot"></span>Actualizado: ' +
+    now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
 }
 
+// ── Fetch with proxy fallback chain ──
 const PROXIES = [
-  url => url,  // direct (works if sheet is published with CORS)
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  url => url,
+  url => 'https://corsproxy.io/?' + encodeURIComponent(url),
+  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
 ];
 
 async function fetchData() {
-  const bust = '&t=' + Date.now();
+  const urlWithBust = CSV_URL + '&t=' + Date.now();
   let lastError;
   for (const proxyFn of PROXIES) {
     try {
-      const url = proxyFn(CSV_URL + bust);
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch(proxyFn(urlWithBust), { cache: 'no-store' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const text = await res.text();
       if (!text || text.length < 10) throw new Error('Empty response');
       renderDashboard(parseCSV(text));
       document.getElementById('error-banner').style.display = 'none';
-      const l = document.getElementById('loading');
-      l.style.opacity = '0';
-      setTimeout(() => l.style.display = 'none', 500);
+      document.getElementById('loading').style.display = 'none';
       return;
     } catch(e) {
       lastError = e;
-      console.warn('Proxy failed, trying next...', e.message);
+      console.warn('Proxy failed:', e.message);
     }
   }
-  // All failed
   console.error('All proxies failed:', lastError);
   document.getElementById('error-banner').style.display = 'block';
-  const l = document.getElementById('loading');
-  l.style.opacity = '0';
-  setTimeout(() => l.style.display = 'none', 500);
+  document.getElementById('loading').style.display = 'none';
 }
 
 fetchData();
