@@ -207,7 +207,7 @@
   /* ── AGENT CARDS ── */
   .agents-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 18px;
     margin-bottom: 22px;
   }
@@ -565,7 +565,6 @@
         <div class="agent-avatar">V</div>
       </div>
       <div class="agent-kpis">
-        <div class="kpi-box"><div class="kpi-val" id="v-agendadas">—</div><div class="kpi-label">Agendadas</div></div>
         <div class="kpi-box"><div class="kpi-val" id="v-realizadas">—</div><div class="kpi-label">Realizadas</div></div>
         <div class="kpi-box"><div class="kpi-val" id="v-nocontact">—</div><div class="kpi-label">No Contact.</div></div>
         <div class="kpi-box"><div class="kpi-val" id="v-sinresp">—</div><div class="kpi-label">Sin Resp.</div></div>
@@ -573,13 +572,11 @@
         <div class="kpi-box deposits"><div class="kpi-val" id="v-dep">—</div><div class="kpi-label">Depósitos</div></div>
       </div>
       <div class="funnel-row">
-        <div class="funnel-step"><div class="funnel-fill" id="vf1" style="width:100%"></div></div>
+        <div class="funnel-step"><div class="funnel-fill" id="vf1" style="width:0%"></div></div>
         <div class="funnel-step"><div class="funnel-fill" id="vf2" style="width:0%"></div></div>
         <div class="funnel-step"><div class="funnel-fill" id="vf3" style="width:0%"></div></div>
-        <div class="funnel-step"><div class="funnel-fill" id="vf4" style="width:0%"></div></div>
       </div>
       <div class="funnel-labels">
-        <span class="funnel-lbl">Agendadas</span>
         <span class="funnel-lbl">Realizadas</span>
         <span class="funnel-lbl">Cotiz.</span>
         <span class="funnel-lbl">Depósitos</span>
@@ -593,7 +590,6 @@
         <div class="agent-avatar">M</div>
       </div>
       <div class="agent-kpis">
-        <div class="kpi-box"><div class="kpi-val" id="m-agendadas">—</div><div class="kpi-label">Agendadas</div></div>
         <div class="kpi-box"><div class="kpi-val" id="m-realizadas">—</div><div class="kpi-label">Realizadas</div></div>
         <div class="kpi-box"><div class="kpi-val" id="m-nocontact">—</div><div class="kpi-label">No Contact.</div></div>
         <div class="kpi-box"><div class="kpi-val" id="m-sinresp">—</div><div class="kpi-label">Sin Resp.</div></div>
@@ -601,13 +597,11 @@
         <div class="kpi-box deposits"><div class="kpi-val" id="m-dep">—</div><div class="kpi-label">Depósitos</div></div>
       </div>
       <div class="funnel-row">
-        <div class="funnel-step"><div class="funnel-fill" id="mf1" style="width:100%"></div></div>
+        <div class="funnel-step"><div class="funnel-fill" id="mf1" style="width:0%"></div></div>
         <div class="funnel-step"><div class="funnel-fill" id="mf2" style="width:0%"></div></div>
         <div class="funnel-step"><div class="funnel-fill" id="mf3" style="width:0%"></div></div>
-        <div class="funnel-step"><div class="funnel-fill" id="mf4" style="width:0%"></div></div>
       </div>
       <div class="funnel-labels">
-        <span class="funnel-lbl">Agendadas</span>
         <span class="funnel-lbl">Realizadas</span>
         <span class="funnel-lbl">Cotiz.</span>
         <span class="funnel-lbl">Depósitos</span>
@@ -621,7 +615,6 @@
         <div class="agent-avatar">G</div>
       </div>
       <div class="agent-kpis">
-        <div class="kpi-box"><div class="kpi-val" id="g-agendadas">—</div><div class="kpi-label">Agendadas</div></div>
         <div class="kpi-box"><div class="kpi-val" id="g-realizadas">—</div><div class="kpi-label">Realizadas</div></div>
         <div class="kpi-box"><div class="kpi-val" id="g-nocontact">—</div><div class="kpi-label">No Contact.</div></div>
         <div class="kpi-box"><div class="kpi-val" id="g-sinresp">—</div><div class="kpi-label">Sin Resp.</div></div>
@@ -629,13 +622,11 @@
         <div class="kpi-box deposits"><div class="kpi-val" id="g-dep">—</div><div class="kpi-label">Depósitos</div></div>
       </div>
       <div class="funnel-row">
-        <div class="funnel-step"><div class="funnel-fill" id="gf1" style="width:100%"></div></div>
+        <div class="funnel-step"><div class="funnel-fill" id="gf1" style="width:0%"></div></div>
         <div class="funnel-step"><div class="funnel-fill" id="gf2" style="width:0%"></div></div>
         <div class="funnel-step"><div class="funnel-fill" id="gf3" style="width:0%"></div></div>
-        <div class="funnel-step"><div class="funnel-fill" id="gf4" style="width:0%"></div></div>
       </div>
       <div class="funnel-labels">
-        <span class="funnel-lbl">Agendadas</span>
         <span class="funnel-lbl">Realizadas</span>
         <span class="funnel-lbl">Cotiz.</span>
         <span class="funnel-lbl">Depósitos</span>
@@ -730,19 +721,17 @@ function renderDashboard(data) {
   for (const agent of AGENTS) {
     const p = ids[agent];
     const t = totals[agent];
-    document.getElementById(`${p}-agendadas`).textContent = t.agendadas || 0;
     document.getElementById(`${p}-realizadas`).textContent = t.realizadas || 0;
     document.getElementById(`${p}-nocontact`).textContent = t.nocontact || 0;
     document.getElementById(`${p}-sinresp`).textContent = t.sinresp || 0;
     document.getElementById(`${p}-cotiz`).textContent = t.cotiz || 0;
     document.getElementById(`${p}-dep`).textContent = t.dep || 0;
 
-    const ag = t.agendadas || 1;
     const fp = p[0];
+    const re = t.realizadas || 1;
     document.getElementById(`${fp}f1`).style.width = '100%';
-    document.getElementById(`${fp}f2`).style.width = Math.min(100, Math.round(((t.realizadas||0)/ag)*100)) + '%';
-    document.getElementById(`${fp}f3`).style.width = Math.min(100, (t.cotiz||0) > 0 ? Math.round(((t.cotiz||0)/ag)*100) : 0) + '%';
-    document.getElementById(`${fp}f4`).style.width = Math.min(100, (t.dep||0) > 0 ? Math.round(((t.dep||0)/ag)*100) : 0) + '%';
+    document.getElementById(`${fp}f2`).style.width = Math.min(100, (t.cotiz||0) > 0 ? Math.round(((t.cotiz||0)/re)*100) : 0) + '%';
+    document.getElementById(`${fp}f3`).style.width = Math.min(100, (t.dep||0) > 0 ? Math.round(((t.dep||0)/re)*100) : 0) + '%';
   }
 
   const days = Object.keys(byDay).sort((a,b) => a-b);
