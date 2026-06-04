@@ -302,6 +302,77 @@
     line-height: 1.3;
   }
 
+  /* ── VALORACIONES TABLE ── */
+  .val-table-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 12px rgba(20,31,78,0.07);
+  }
+
+  .val-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(20,31,78,0.07);
+  }
+  .val-row:last-child { border-bottom: none; }
+
+  .val-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+    color: var(--navy-dark);
+    width: 110px;
+    flex-shrink: 0;
+  }
+
+  .val-bar-wrap {
+    flex: 1;
+    height: 26px;
+    background: rgba(20,31,78,0.07);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .val-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    transition: width 1s cubic-bezier(0.4,0,0.2,1);
+    min-width: 32px;
+  }
+
+  .val-bar-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  .val-total {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    color: var(--navy-dark);
+    width: 48px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .val-pct {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    width: 38px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
   /* ── BOTTOM ── */
   .bottom-section {
     display: grid;
@@ -568,6 +639,12 @@
     </div>
   </div>
 
+  <!-- VALORACIONES TABLE -->
+  <div class="val-table-card" style="margin-bottom:18px;">
+    <div class="card-title">Valoraciones Realizadas por Valorador — Acumulado del mes</div>
+    <div id="val-table"></div>
+  </div>
+
   <!-- BOTTOM -->
   <div class="bottom-section">
     <div class="chart-card">
@@ -600,9 +677,11 @@ function parseCSV(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const data = {
     byDay: {},
-    totals: { victor:{realizadas:0,nocontact:0,sinresp:0,cotiz:0,dep:0},
-               martin:{realizadas:0,nocontact:0,sinresp:0,cotiz:0,dep:0},
-               guillermo:{realizadas:0,nocontact:0,sinresp:0,cotiz:0,dep:0} },
+    totals: {
+      victor:    {agendadas:0, realizadas:0, nocontact:0, sinresp:0, cotiz:0, dep:0},
+      martin:    {agendadas:0, realizadas:0, nocontact:0, sinresp:0, cotiz:0, dep:0},
+      guillermo: {agendadas:0, realizadas:0, nocontact:0, sinresp:0, cotiz:0, dep:0}
+    },
     agendadasTotal: 0
   };
 
@@ -610,21 +689,23 @@ function parseCSV(text) {
 
   for (const line of lines) {
     const parts = line.split(',').map(v => v.trim());
-    const first = parts[0].toLowerCase();
+    const first = parts[0].toLowerCase().replace(/\s+/g, ' ');
 
-    // Day header row — col 0 = day label, col 1 = agendadas total
+    // Day header: "1 junio", "2 junio", etc. — col1 = total agendadas for the day
     if (/^\d+\s+junio/.test(first)) {
       currentDay = parseInt(first);
       data.byDay[currentDay] = { victor:0, martin:0, guillermo:0 };
-      const ag = parseInt(parts[1]) || 0;
-      data.agendadasTotal += ag;
+      data.agendadasTotal += parseInt(parts[1]) || 0;
       continue;
     }
 
-    const agentKey = AGENTS.find(a => first.startsWith(a));
+    // Agent row — name may have trailing space
+    const agentKey = AGENTS.find(a => first.replace(/\s+$/,'') === a);
     if (!agentKey || !currentDay) continue;
 
     const t = data.totals[agentKey];
+    // col1=agendadas(individual), col2=realizadas, col3=nocontact, col4=sinresp, col5=cotiz, col6=dep
+    t.agendadas  += parseInt(parts[1]) || 0;
     t.realizadas += parseInt(parts[2]) || 0;
     t.nocontact  += parseInt(parts[3]) || 0;
     t.sinresp    += parseInt(parts[4]) || 0;
@@ -666,6 +747,9 @@ function renderDashboard(data) {
     document.getElementById(p + '-cotiz').textContent      = t.cotiz;
     document.getElementById(p + '-dep').textContent        = t.dep;
   }
+
+  // Valoraciones table
+  renderValTable(totals);
 
   // Bar chart — deposits per day
   const days = Object.keys(byDay).sort((a,b) => a-b);
@@ -720,6 +804,40 @@ function renderDashboard(data) {
   document.getElementById('last-update').innerHTML =
     '<span class="status-dot"></span>Actualizado: ' +
     now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+}
+
+// ── Valoraciones Table ──
+function renderValTable(totals) {
+  const el = document.getElementById('val-table');
+  if (!el) return;
+
+  const rows = AGENTS.map(a => ({
+    name: a.charAt(0).toUpperCase() + a.slice(1),
+    agent: a,
+    realizadas: totals[a].realizadas || 0
+  }));
+
+  const maxVal = Math.max(1, ...rows.map(r => r.realizadas));
+  const totalVal = rows.reduce((s, r) => s + r.realizadas, 0);
+
+  el.innerHTML = '';
+  rows.forEach(r => {
+    const pct = totalVal > 0 ? Math.round((r.realizadas / totalVal) * 100) : 0;
+    const barW = Math.max(4, Math.round((r.realizadas / maxVal) * 100));
+    const color = AGENT_COLORS[r.agent];
+
+    const row = document.createElement('div');
+    row.className = 'val-row';
+    row.innerHTML =
+      '<div class="val-name">' + r.name + '</div>' +
+      '<div class="val-bar-wrap">' +
+        '<div class="val-bar-fill" style="width:' + barW + '%;background:' + color + '">' +
+          '<span class="val-bar-count">' + r.realizadas + ' valoraciones</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="val-pct">' + pct + '%</div>';
+    el.appendChild(row);
+  });
 }
 
 // ── Fetch with proxy fallback chain ──
