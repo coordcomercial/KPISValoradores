@@ -380,6 +380,11 @@
     gap: 18px;
   }
 
+  .charts-col {
+    display: flex;
+    flex-direction: column;
+  }
+
   .chart-card, .ranking-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -454,36 +459,44 @@
     color: var(--text-muted);
     width: 28px;
     text-align: center;
+    flex-shrink: 0;
   }
 
   .rank-num.top { color: var(--teal); }
 
   .rank-info { flex: 1; }
 
+  .rank-name-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
   .rank-name {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     letter-spacing: 1px;
     color: var(--navy-dark);
   }
 
+  .rank-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
   .rank-bar-wrap {
-    height: 5px;
+    height: 8px;
     background: rgba(20,31,78,0.08);
-    border-radius: 3px;
-    margin-top: 5px;
+    border-radius: 4px;
     overflow: hidden;
   }
 
   .rank-bar-fill {
     height: 100%;
-    border-radius: 3px;
+    border-radius: 4px;
     transition: width 1.2s ease;
-  }
-
-  .rank-value {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2rem;
   }
 
   /* Loading */
@@ -647,9 +660,15 @@
 
   <!-- BOTTOM -->
   <div class="bottom-section">
-    <div class="chart-card">
-      <div class="card-title">Depósitos por día — Evolución del mes</div>
-      <div class="bar-chart" id="bar-chart"></div>
+    <div class="charts-col">
+      <div class="chart-card" style="margin-bottom:16px;">
+        <div class="card-title">Depósitos por día — Evolución del mes</div>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">Valoraciones Realizadas por día</div>
+        <div class="bar-chart" id="bar-chart-val"></div>
+      </div>
     </div>
     <div class="ranking-card">
       <div class="card-title">Ranking — Depósitos acumulados</div>
@@ -665,18 +684,23 @@ const AGENT_COLORS = { victor: '#3DBCC4', martin: '#7c6af7', guillermo: '#ff9e5e
 
 // ── Clock ──
 function updateClock() {
-  const now = new Date();
   document.getElementById('clock').textContent =
-    now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
 setInterval(updateClock, 1000);
 updateClock();
 
 // ── Parse CSV ──
+// Structure per day:
+//   "1 junio"          <- day header, no columns
+//   "Victor ,6,0,..."  <- col1=agendadas, col2=realizadas, col3=nocontact, col4=sinresp, col5=cotiz, col6=dep
+//   "Martin ,,3,..."   <- col1=empty, col2=realizadas, col3=nocontact, col4=sinresp, col5=cotiz, col6=dep
+//   "Guillermo,,4,..." <- same as Martin
 function parseCSV(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const data = {
     byDay: {},
+    byDayRealizadas: {},
     totals: {
       victor:    {agendadas:0, realizadas:0, nocontact:0, sinresp:0, cotiz:0, dep:0},
       martin:    {agendadas:0, realizadas:0, nocontact:0, sinresp:0, cotiz:0, dep:0},
@@ -684,42 +708,53 @@ function parseCSV(text) {
     },
     agendadasTotal: 0
   };
-
   let currentDay = null;
 
   for (const line of lines) {
     const parts = line.split(',').map(v => v.trim());
-    const first = parts[0].toLowerCase().replace(/\s+/g, ' ');
+    const first = parts[0].toLowerCase().trim();
 
-    // Day header: "1 junio", "2 junio", etc. — col1 = total agendadas for the day
+    // Skip header row
+    if (first === '' && parts[1] && parts[1].toLowerCase().includes('valoracion')) continue;
+
+    // Day header row — "1 junio", "2 junio", etc.
     if (/^\d+\s+junio/.test(first)) {
       currentDay = parseInt(first);
       data.byDay[currentDay] = { victor:0, martin:0, guillermo:0 };
-      data.agendadasTotal += parseInt(parts[1]) || 0;
+      data.byDayRealizadas[currentDay] = { victor:0, martin:0, guillermo:0 };
       continue;
     }
 
-    // Agent row — name may have trailing space
-    const agentKey = AGENTS.find(a => first.replace(/\s+$/,'') === a);
+    // Agent row
+    const agentKey = AGENTS.find(a => first === a || first === a + ' ' || first.startsWith(a + ' '));
     if (!agentKey || !currentDay) continue;
+    if (agentKey === 'desconocido') continue;
 
     const t = data.totals[agentKey];
-    // col1=agendadas(individual), col2=realizadas, col3=nocontact, col4=sinresp, col5=cotiz, col6=dep
-    t.agendadas  += parseInt(parts[1]) || 0;
-    t.realizadas += parseInt(parts[2]) || 0;
-    t.nocontact  += parseInt(parts[3]) || 0;
-    t.sinresp    += parseInt(parts[4]) || 0;
-    t.cotiz      += parseInt(parts[5]) || 0;
-    t.dep        += parseInt(parts[6]) || 0;
+    const ag = parseInt(parts[1]) || 0;
+    const re = parseInt(parts[2]) || 0;
+    const nc = parseInt(parts[3]) || 0;
+    const sr = parseInt(parts[4]) || 0;
+    const co = parseInt(parts[5]) || 0;
+    const dp = parseInt(parts[6]) || 0;
 
-    data.byDay[currentDay][agentKey] = (data.byDay[currentDay][agentKey] || 0) + (parseInt(parts[6]) || 0);
+    t.agendadas  += ag;
+    t.realizadas += re;
+    t.nocontact  += nc;
+    t.sinresp    += sr;
+    t.cotiz      += co;
+    t.dep        += dp;
+
+    data.agendadasTotal += ag;
+    data.byDay[currentDay][agentKey] = (data.byDay[currentDay][agentKey]||0) + dp;
+    data.byDayRealizadas[currentDay][agentKey] = (data.byDayRealizadas[currentDay][agentKey]||0) + re;
   }
   return data;
 }
 
-// ── Render ──
+// ── Render Dashboard ──
 function renderDashboard(data) {
-  const { totals, byDay, agendadasTotal } = data;
+  const { totals, byDay, byDayRealizadas, agendadasTotal } = data;
 
   // Team totals
   let tRe=0, tSr=0, tCo=0, tDe=0;
@@ -734,53 +769,31 @@ function renderDashboard(data) {
   document.getElementById('t-sinrespuesta').textContent = tSr;
   document.getElementById('t-cotizaciones').textContent = tCo;
   document.getElementById('t-depositos').textContent    = tDe;
-  document.getElementById('t-conversion').textContent   = tCo > 0 ? Math.round((tDe/tCo)*100) + '%' : '0%';
+  document.getElementById('t-conversion').textContent   = tCo > 0 ? Math.round((tDe/tCo)*100)+'%' : '0%';
 
   // Agent cards
   const ids = { victor:'v', martin:'m', guillermo:'g' };
   for (const agent of AGENTS) {
     const p = ids[agent];
     const t = totals[agent];
-    document.getElementById(p + '-realizadas').textContent = t.realizadas;
-    document.getElementById(p + '-nocontact').textContent  = t.nocontact;
-    document.getElementById(p + '-sinresp').textContent    = t.sinresp;
-    document.getElementById(p + '-cotiz').textContent      = t.cotiz;
-    document.getElementById(p + '-dep').textContent        = t.dep;
+    document.getElementById(p+'-realizadas').textContent = t.realizadas;
+    document.getElementById(p+'-nocontact').textContent  = t.nocontact;
+    document.getElementById(p+'-sinresp').textContent    = t.sinresp;
+    document.getElementById(p+'-cotiz').textContent      = t.cotiz;
+    document.getElementById(p+'-dep').textContent        = t.dep;
   }
 
-  // Valoraciones table
+  // Valoraciones table (realizadas por agente con barra de color)
   renderValTable(totals);
 
   // Bar chart — deposits per day
-  const days = Object.keys(byDay).sort((a,b) => a-b);
-  const maxDep = Math.max(1, ...days.map(d => AGENTS.reduce((s,a) => s + (byDay[d][a]||0), 0)));
-  const chartEl = document.getElementById('bar-chart');
-  chartEl.innerHTML = '';
-  for (const day of days) {
-    const group = document.createElement('div');
-    group.className = 'bar-group';
-    const barsDiv = document.createElement('div');
-    barsDiv.className = 'bars';
-    for (const agent of AGENTS) {
-      const val = byDay[day][agent] || 0;
-      const bar = document.createElement('div');
-      bar.className = 'bar';
-      bar.style.height = Math.max(4, Math.round((val/maxDep)*100)) + '%';
-      bar.style.background = AGENT_COLORS[agent];
-      bar.style.opacity = val > 0 ? '1' : '0.15';
-      bar.title = agent + ': ' + val;
-      barsDiv.appendChild(bar);
-    }
-    const label = document.createElement('div');
-    label.className = 'bar-day';
-    label.textContent = day;
-    group.appendChild(barsDiv);
-    group.appendChild(label);
-    chartEl.appendChild(group);
-  }
+  renderBarChart(byDay, 'bar-chart', 'dep');
+
+  // Bar chart — realizadas per day
+  renderBarChart(byDayRealizadas, 'bar-chart-val', 'val');
 
   // Ranking
-  const ranked = AGENTS.map(a => ({ name:a, dep: totals[a].dep })).sort((a,b) => b.dep-a.dep);
+  const ranked = AGENTS.map(a => ({ name:a, dep:totals[a].dep })).sort((a,b)=>b.dep-a.dep);
   const maxRank = ranked[0].dep || 1;
   const rankEl = document.getElementById('ranking-rows');
   rankEl.innerHTML = '';
@@ -790,62 +803,84 @@ function renderDashboard(data) {
     const row = document.createElement('div');
     row.className = 'rank-row';
     row.innerHTML =
-      '<div class="rank-num ' + (i===0?'top':'') + '">' + (i+1) + '</div>' +
-      '<div class="rank-info">' +
-        '<div class="rank-name">' + name + '</div>' +
-        '<div class="rank-bar-wrap"><div class="rank-bar-fill" style="width:' + Math.round((item.dep/maxRank)*100) + '%;background:' + color + '"></div></div>' +
-      '</div>' +
-      '<div class="rank-value" style="color:' + color + '">' + item.dep + '</div>';
+      '<div class="rank-num '+(i===0?'top':'')+'">'+(i+1)+'</div>'+
+      '<div class="rank-info">'+
+        '<div class="rank-name-row">'+
+          '<div class="rank-name">'+name+'</div>'+
+          '<div class="rank-value" style="color:'+color+'">'+item.dep+'</div>'+
+        '</div>'+
+        '<div class="rank-bar-wrap"><div class="rank-bar-fill" style="width:'+Math.round((item.dep/maxRank)*100)+'%;background:'+color+'"></div></div>'+
+      '</div>';
     rankEl.appendChild(row);
   });
 
   // Timestamp
-  const now = new Date();
   document.getElementById('last-update').innerHTML =
     '<span class="status-dot"></span>Actualizado: ' +
-    now.toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'});
+    new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
 }
 
-// ── Valoraciones Table ──
 function renderValTable(totals) {
   const el = document.getElementById('val-table');
   if (!el) return;
-
-  const rows = AGENTS.map(a => ({
-    name: a.charAt(0).toUpperCase() + a.slice(1),
-    agent: a,
-    realizadas: totals[a].realizadas || 0
-  }));
-
+  const rows = AGENTS.map(a => ({ name: a.charAt(0).toUpperCase()+a.slice(1), agent:a, realizadas: totals[a].realizadas }));
   const maxVal = Math.max(1, ...rows.map(r => r.realizadas));
-  const totalVal = rows.reduce((s, r) => s + r.realizadas, 0);
-
+  const totalVal = rows.reduce((s,r) => s+r.realizadas, 0);
   el.innerHTML = '';
   rows.forEach(r => {
-    const pct = totalVal > 0 ? Math.round((r.realizadas / totalVal) * 100) : 0;
-    const barW = Math.max(4, Math.round((r.realizadas / maxVal) * 100));
+    const pct = totalVal > 0 ? Math.round((r.realizadas/totalVal)*100) : 0;
+    const barW = Math.max(4, Math.round((r.realizadas/maxVal)*100));
     const color = AGENT_COLORS[r.agent];
-
     const row = document.createElement('div');
     row.className = 'val-row';
     row.innerHTML =
-      '<div class="val-name">' + r.name + '</div>' +
-      '<div class="val-bar-wrap">' +
-        '<div class="val-bar-fill" style="width:' + barW + '%;background:' + color + '">' +
-          '<span class="val-bar-count">' + r.realizadas + ' valoraciones</span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="val-pct">' + pct + '%</div>';
+      '<div class="val-name">'+r.name+'</div>'+
+      '<div class="val-bar-wrap">'+
+        '<div class="val-bar-fill" style="width:'+barW+'%;background:'+color+'">'+
+          '<span class="val-bar-count">'+r.realizadas+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="val-pct">'+pct+'%</div>';
     el.appendChild(row);
   });
+}
+
+function renderBarChart(byDayData, chartId, type) {
+  const chartEl = document.getElementById(chartId);
+  if (!chartEl) return;
+  const days = Object.keys(byDayData).sort((a,b)=>a-b);
+  const maxVal = Math.max(1, ...days.map(d => AGENTS.reduce((s,a)=>s+(byDayData[d][a]||0),0)));
+  chartEl.innerHTML = '';
+  for (const day of days) {
+    const group = document.createElement('div');
+    group.className = 'bar-group';
+    const barsDiv = document.createElement('div');
+    barsDiv.className = 'bars';
+    for (const agent of AGENTS) {
+      const val = byDayData[day][agent] || 0;
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = Math.max(4, Math.round((val/maxVal)*100))+'%';
+      bar.style.background = AGENT_COLORS[agent];
+      bar.style.opacity = val > 0 ? '1' : '0.15';
+      bar.title = agent+': '+val;
+      barsDiv.appendChild(bar);
+    }
+    const label = document.createElement('div');
+    label.className = 'bar-day';
+    label.textContent = day;
+    group.appendChild(barsDiv);
+    group.appendChild(label);
+    chartEl.appendChild(group);
+  }
 }
 
 // ── Fetch with proxy fallback chain ──
 const PROXIES = [
   url => url,
-  url => 'https://corsproxy.io/?' + encodeURIComponent(url),
-  url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-  url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  url => 'https://corsproxy.io/?'+encodeURIComponent(url),
+  url => 'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
+  url => 'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(url),
 ];
 
 async function fetchData() {
@@ -853,10 +888,10 @@ async function fetchData() {
   let lastError;
   for (const proxyFn of PROXIES) {
     try {
-      const res = await fetch(proxyFn(urlWithBust), { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const res = await fetch(proxyFn(urlWithBust), { cache:'no-store' });
+      if (!res.ok) throw new Error('HTTP '+res.status);
       const text = await res.text();
-      if (!text || text.length < 10) throw new Error('Empty response');
+      if (!text || text.length < 10) throw new Error('Empty');
       renderDashboard(parseCSV(text));
       document.getElementById('error-banner').style.display = 'none';
       document.getElementById('loading').style.display = 'none';
