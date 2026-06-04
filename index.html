@@ -657,8 +657,7 @@
 </div>
 
 <script>
-const SHEET_ID = '1n51P1okMzuVYV2BTVKOennoSshFD5CigfSSeuFPIv-c';
-const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSw_18t7m_RbtB_j69O2nFLZcoxzsZsN9SRZobExoquJf0bbs-6ly_JrTN6VknJ5XGiaA_6lhM6H_Pn/pub?gid=0&single=true&output=csv';
 const PROXY = `https://api.allorigins.win/raw?url=${encodeURIComponent(CSV_URL)}`;
 
 const AGENTS = ['victor', 'martin', 'guillermo'];
@@ -801,21 +800,40 @@ function renderDashboard(data) {
     `<span class="status-dot"></span>Actualizado: ${now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}`;
 }
 
+const PROXIES = [
+  url => url,  // direct (works if sheet is published with CORS)
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
+
 async function fetchData() {
-  try {
-    const res = await fetch(PROXY + '&t=' + Date.now());
-    if (!res.ok) throw new Error('fetch failed');
-    const text = await res.text();
-    renderDashboard(parseCSV(text));
-    document.getElementById('error-banner').style.display = 'none';
-  } catch(e) {
-    console.error(e);
-    document.getElementById('error-banner').style.display = 'block';
-  } finally {
-    const l = document.getElementById('loading');
-    l.style.opacity = '0';
-    setTimeout(() => l.style.display = 'none', 500);
+  const bust = '&t=' + Date.now();
+  let lastError;
+  for (const proxyFn of PROXIES) {
+    try {
+      const url = proxyFn(CSV_URL + bust);
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      if (!text || text.length < 10) throw new Error('Empty response');
+      renderDashboard(parseCSV(text));
+      document.getElementById('error-banner').style.display = 'none';
+      const l = document.getElementById('loading');
+      l.style.opacity = '0';
+      setTimeout(() => l.style.display = 'none', 500);
+      return;
+    } catch(e) {
+      lastError = e;
+      console.warn('Proxy failed, trying next...', e.message);
+    }
   }
+  // All failed
+  console.error('All proxies failed:', lastError);
+  document.getElementById('error-banner').style.display = 'block';
+  const l = document.getElementById('loading');
+  l.style.opacity = '0';
+  setTimeout(() => l.style.display = 'none', 500);
 }
 
 fetchData();
